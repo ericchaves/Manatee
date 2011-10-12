@@ -160,13 +160,18 @@ namespace Manatee {
         /// This is where the shorthand types are deciphered. Fix/love/tweak as you will
         /// </summary>
         private string SetColumnType(string colType) {
-            return colType.Replace("pk", "int PRIMARY KEY IDENTITY(1,1)")
-                .Replace("money", "decimal(8,2)")
-                .Replace("date", "datetime")
-                .Replace("string", "nvarchar(255)")
-                .Replace("boolean", "bit")
-                .Replace("text", "nvarchar(MAX)")
-                .Replace("guid", "uniqueidentifier");
+            // Load extended types from file
+            var columns_types = Path.Combine(Directory.GetCurrentDirectory(), "custom_types.yml");
+            if (File.Exists(columns_types))
+                using (var t = new StreamReader(columns_types))
+                {
+                    var bits = t.ReadToEnd();
+                    JavaScriptSerializer deserializer = new JavaScriptSerializer();
+                    Dictionary<string, string> columns = (Dictionary<string, string>)deserializer.Deserialize(bits, typeof(Dictionary<string, string>));
+                    foreach (dynamic c in columns)
+                        colType = colType.Replace(c.Key, c.Value);
+                 }
+            return colType;
         }
 
         /// <summary>
