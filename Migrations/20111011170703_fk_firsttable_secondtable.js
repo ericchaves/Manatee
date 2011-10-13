@@ -1,0 +1,10 @@
+{
+	up:{
+		foreign_key:{
+			from_table:'FirstTable',
+            to_table:'SecondTable',
+            from_column:'ID',
+            to_column:'firstTableID'
+		}
+	}
+}
