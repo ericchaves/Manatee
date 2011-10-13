@@ -15,6 +15,19 @@ namespace VidPub.Tasks {
         //there
         static bool _syncTestDB = false;
 
+
+        static Program()
+        {
+            // Test if there is an app.config or web.config in Working Directory.
+            // If so bind the configuration to them. This allows Manatee to be used as external tool 
+            // and have it load the connection strings from the projects configuration file.
+            string working_dir = Directory.GetCurrentDirectory();
+            if (File.Exists(Path.Combine(working_dir, "app.config")))
+                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "app.config"));
+            else if (File.Exists(Path.Combine(working_dir, "web.config")))
+                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "web.config"));
+        }
+
         static string[] _args;
         static void Main(string[] args) {
             var migrationDir = LocateMigrations();
