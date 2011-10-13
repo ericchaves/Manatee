@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Web.Script.Serialization;
 using System.Text;
+using System.Reflection;
 
 namespace Manatee {
     public class Migrator {
@@ -161,15 +162,15 @@ namespace Manatee {
         /// </summary>
         private string SetColumnType(string colType) {
             // Load extended types from file
-            var columns_types = Path.Combine(Directory.GetCurrentDirectory(), "custom_types.yml");
-            if (File.Exists(columns_types))
-                using (var t = new StreamReader(columns_types))
+            var datatypes = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "datatypes.yml");
+            if (File.Exists(datatypes))
+                using (var t = new StreamReader(datatypes))
                 {
                     var bits = t.ReadToEnd();
                     JavaScriptSerializer deserializer = new JavaScriptSerializer();
-                    Dictionary<string, string> columns = (Dictionary<string, string>)deserializer.Deserialize(bits, typeof(Dictionary<string, string>));
-                    foreach (dynamic c in columns)
-                        colType = colType.Replace(c.Key, c.Value);
+                    Dictionary<string, string> dt = (Dictionary<string, string>)deserializer.Deserialize(bits, typeof(Dictionary<string, string>));
+                    if (dt.ContainsKey(colType))
+                        return dt[colType];
                  }
             return colType;
         }

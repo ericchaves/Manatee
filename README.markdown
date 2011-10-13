@@ -42,6 +42,7 @@ The next simplest thing to do is to specify a few things with some more structur
                 columns: [
                     { name: "title", type: "string" },
                     { name: "description", type: "text" }
+					{ name: "usage_count", type: "int", def: "0", nullable: false}
                 ]
             }
         }
@@ -49,7 +50,7 @@ The next simplest thing to do is to specify a few things with some more structur
 
 In this example I'm using structured JSON - setting the table name and the columns (which need to be an array). JSON can be tricky for some people - but it's just the same as C# anonymous object declaration and after you do it once or twice you'll dig it.
 
-The datatypes used here are the same shorthand as the SQL call above - string will be converted the same way (as will money, text, boolean, and so on). Also - a bit of sweetness thrown in - if you want to have "audit" columns you can by setting `timestamps` to true. This will drop in two columns: "CreatedOn" and "UpdatedOn" that you should update when saving your data.
+The datatypes used here are the same shorthand as the SQL call above - string will be converted the same way (as will money, text, boolean, and so on). In order to add your own datatypes edit the file datatypes.yml Also - a bit of sweetness thrown in - if you want to have "audit" columns you can by setting `timestamps` to true. This will drop in two columns: "CreatedOn" and "UpdatedOn" that you should update when saving your data.
 
 Finally - notice that there's no primary key defined? I meant to  - and sometimes we forget these things. I won't let you  - if you forget a PK it will automatically added for you (and called "Id").
 	

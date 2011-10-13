@@ -5,8 +5,7 @@
             columns:[
                 {name:'name', type:'string'},
                 {name:'description', type:'text'},
-                {name:'firstTableID',type:'int'},
-			    {name:'amount',type:'money_4'}
+                {name:'firstTableID',type:'int'}
              ],
             timestamps:true
          }

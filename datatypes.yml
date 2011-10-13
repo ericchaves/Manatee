@@ -1,10 +1,9 @@
 ﻿{ 
-"pk": "int PRIMARY KEY IDENTITY(1,1)",
-"money": "decimal(8,2)",
-"date": "datetime",
-"string": "nvarchar(255)",
-"boolean": "bit",
-"text": "nvarchar(MAX)",
-"guid": "uniqueidentifier",
-"money_4": "decimal(8,4)"
+  "pk": "int PRIMARY KEY IDENTITY(1,1)",
+  "money": "decimal(8,2)",
+  "date": "datetime",
+  "string": "nvarchar(255)",
+  "boolean": "bit",
+  "text": "nvarchar(MAX)",
+  "guid": "uniqueidentifier"
 }
