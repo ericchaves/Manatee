@@ -30,6 +30,7 @@ namespace VidPub.Tasks {
 
         static string[] _args;
         static void Main(string[] args) {
+        
             var migrationDir = LocateMigrations();
 
             _args = args;
@@ -189,8 +190,12 @@ namespace VidPub.Tasks {
             DecideWhatToDo(command);
         }
         static string LocateMigrations() {
+            string current = Directory.GetCurrentDirectory();
+            if (Directory.Exists(Path.Combine(current, "Migrations")))
+                return Path.Combine(current, "Migrations");
+
             //this is the bin/release or bin/debug
-            var binDirectory = new DirectoryInfo(Directory.GetCurrentDirectory());
+            var binDirectory = new DirectoryInfo(current);
             //get the root - go up two levels
             var rootDirectory = binDirectory.Parent.Parent;
             //return the Migrations directory

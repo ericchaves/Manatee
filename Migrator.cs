@@ -162,7 +162,7 @@ namespace Manatee {
         /// </summary>
         private string SetColumnType(string colType) {
             // Load extended types from file
-            var datatypes = Path.Combine(Directory.GetCurrentDirectory(), "datatypes.yml");
+            var datatypes = Path.Combine(Directory.GetCurrentDirectory(), @"Migrations\datatypes.yml");
             if (File.Exists(datatypes))
                 using (var t = new StreamReader(datatypes))
                 {
