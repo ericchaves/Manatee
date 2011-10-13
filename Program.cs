@@ -26,6 +26,12 @@ namespace VidPub.Tasks {
                 AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "app.config"));
             else if (File.Exists(Path.Combine(working_dir, "web.config")))
                 AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "web.config"));
+
+            if (!File.Exists(Path.Combine(working_dir, "datatypes.yml")))
+                using (StreamWriter outfile = new StreamWriter(Path.Combine(working_dir, "datatypes.yml")))
+                {
+                    outfile.Write("{ \r\n  'pk': 'int PRIMARY KEY IDENTITY(1,1)',\r\n  'money': 'decimal(8,2)',\r\n  'date': 'datetime',\r\n  'string': 'nvarchar(255)',\r\n  'boolean': 'bit',\r\n  'text': 'nvarchar(MAX)',\r\n  'guid': 'uniqueidentifier'\r\n}");       
+                }
         }
 
         static string[] _args;
