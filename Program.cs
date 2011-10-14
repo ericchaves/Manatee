@@ -19,11 +19,12 @@ namespace VidPub.Tasks {
         private static string _project_dir;
         private static string _datatypes;
 
-        static void Initialize()
+        static void Initialize(string projectDir)
         {
             // Test if there is an app.config or web.config in Working Directory.
             // If so bind the configuration to them. This allows Manatee to be used as external tool 
             // and have it load the connection strings from the projects configuration file.
+            _project_dir = projectDir;
             if (File.Exists(Path.Combine(_project_dir, "app.config")))
                 AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(_project_dir, "app.config"));
             else if (File.Exists(Path.Combine(_project_dir, "web.config")))
@@ -39,29 +40,15 @@ namespace VidPub.Tasks {
             _migration_dir = Path.Combine(_project_dir, "Migrations");
             if (!Directory.Exists(_migration_dir))
                 Directory.CreateDirectory(_migration_dir);
+            Console.WriteLine("Working in directory:\t{0}",_project_dir);
+            Reload();
         }
 
         static string[] _args;
         static void Main(string[] args)
         {
-            
-            #region Parse Arguments
-            _project_dir = Directory.GetCurrentDirectory();
-            int i = 0;
-            while (i < args.Length-1)
-            {
-                if (args[i].Equals("/project"))
-                {
-                    _project_dir = Path.GetFullPath(args[++i]); 
-                }else
-                  i++;
-            }
-            Initialize();
-            Console.WriteLine("Datatypes:\t{0}\r\nMigrations:\t{1}\r\nWorking dir:\t{2}", _datatypes, _migration_dir, _project_dir);
-            #endregion
-          
             _args = args;
-            Reload();
+            Initialize(Directory.GetCurrentDirectory());
             SayHello();
         }
 
@@ -132,7 +119,12 @@ namespace VidPub.Tasks {
         static void DecideWhatToDo(string command){
             int version = WhichVersion(command);
             bool shouldExecute = ShouldExecute(command);
-            if(command.StartsWith("up")){
+            if (command.StartsWith("cd "))
+            {
+                string[] cd = command.Split(new char[] { ' ' });
+                if (cd.Length > 1)
+                    Initialize(Path.GetFullPath(cd[1]));
+            }else if(command.StartsWith("up")){
                 if (version < 0)
                     version = _development.LastVersion;
                 //roll it to the top
@@ -192,6 +184,7 @@ namespace VidPub.Tasks {
             Console.WriteLine("You can say 'up', 'down', or 'migrate' with some arguments. Those arguments are:");
             Console.WriteLine(" ... /v - this is the version number to go up or down to. To wipe our your DB, /v 0");
             Console.WriteLine(" ... /p - Print out the commands only");
+            Console.WriteLine(" ... 'cd {path}' will change working directory.");
             Console.WriteLine(" ... 'back' or rollback goes back a single version");
             Console.WriteLine(" ... 'up' will run every migration not run");
             Console.WriteLine(" ... 'exit' or 'quit' will... well you know.");
