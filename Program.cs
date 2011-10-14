@@ -34,7 +34,7 @@ namespace VidPub.Tasks {
             if (!File.Exists(_datatypes))
                 using (StreamWriter outfile = new StreamWriter(_datatypes))
                 {
-                    outfile.Write("{ \r\n  'pk': 'int PRIMARY KEY IDENTITY(1,1)',\r\n  'money': 'decimal(8,4)',\r\n  'date': 'datetime',\r\n  'string': 'nvarchar(255)',\r\n  'boolean': 'bit',\r\n  'text': 'nvarchar(MAX)',\r\n  'guid': 'uniqueidentifier'\r\n}");
+                    outfile.Write(Templates.Datatypes);
                 }
 
             _migration_dir = Path.Combine(_project_dir, "Migrations");
@@ -160,6 +160,11 @@ namespace VidPub.Tasks {
                 _production.Migrate();
             }else if (command.StartsWith("reload")||command.Equals("r")){
                 Reload();
+            }else if(command.StartsWith("syncdb")){
+                string[] sync = command.Split(new char[]{' '});
+                if (sync.Length > 1)
+                    _syncTestDB = sync[1].Equals("on");
+                Console.WriteLine("syncTestDB is {0}", _syncTestDB ? "on" :"off");
             }else{
                 HelpEmOut();
             }
@@ -184,7 +189,8 @@ namespace VidPub.Tasks {
             Console.WriteLine("You can say 'up', 'down', or 'migrate' with some arguments. Those arguments are:");
             Console.WriteLine(" ... /v - this is the version number to go up or down to. To wipe our your DB, /v 0");
             Console.WriteLine(" ... /p - Print out the commands only");
-            Console.WriteLine(" ... 'cd {path}' will change working directory.");
+            Console.WriteLine(" ... 'cd <path>' will change working directory.");
+            Console.WriteLine(" ... 'syncdb [on|off]' will enable or disable the syncTestDB flag.");
             Console.WriteLine(" ... 'back' or rollback goes back a single version");
             Console.WriteLine(" ... 'up' will run every migration not run");
             Console.WriteLine(" ... 'exit' or 'quit' will... well you know.");

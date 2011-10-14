@@ -40,7 +40,7 @@ The next simplest thing to do is to specify a few things with some more structur
                 name: "categories",
                 timestamps: true,
                 columns: [
-                    { name: "title", type: "string" },
+                    { name: "title", type: "string" , unique: true},
                     { name: "description", type: "text" }
 					{ name: "usage_count", type: "int", def: "0", nullable: false}
                 ]

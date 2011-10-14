@@ -5,6 +5,21 @@ using System.Text;
 
 namespace Manatee {
     public class Templates {
+        public static string Datatypes
+        {
+            get
+            {
+                return @"{ 
+  'pk': 'int PRIMARY KEY IDENTITY(1,1)',
+  'money': 'decimal(8,4)',
+  'date': 'datetime',
+  'string': 'nvarchar(255)',
+  'boolean': 'bit',
+  'text': 'nvarchar(MAX)',
+  'guid': 'uniqueidentifier'
+}";
+            }
+        }
         public static string Blank {
             get {
                 return @"{
