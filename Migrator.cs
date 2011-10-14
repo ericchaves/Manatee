@@ -13,11 +13,14 @@ using System.Reflection;
 
 namespace Manatee {
     public class Migrator {
-
+        
+        private string _datatypes;
         private int _currentVersion;
         int _versionCount = 0;
         private Database _db;
         bool _showOutput = true;
+        public SortedList<string, dynamic> Migrations { get; private set; }
+        
         void Execute(string query, params Database[] dbs) {
             foreach (var db in dbs) {
                 db.Execute(query);
@@ -79,49 +82,135 @@ namespace Manatee {
             }
         }
 
-        public Migrator(string pathToMigrationFiles, string connectionStringName = "", bool silent = false) {
+        public Migrator(string pathToDatatypes, string pathToMigrationFiles, string connectionStringName = "", bool silent = false) {
+            _datatypes = pathToDatatypes;
             _db = new Database(connectionStringName);
             Migrations = LoadMigrations(pathToMigrationFiles);
             EnsureSchema(_db);
             _showOutput = !silent;
-            _currentVersion = (int)_db.QueryValue("SELECT Version from SchemaInfo");
-            _versionCount = Migrations.Count;
+            _currentVersion = Migrations.IndexOfKey((string)_db.QueryValue("SELECT Version from SchemaInfo"));
         }
 
-        public IDictionary<string, dynamic> Migrations { get; private set; }
+        
         public int LastVersion {
             get {
-                return _versionCount;
+                return Migrations.Count;
             }
         }
+
         public int CurrentVersion {
-            get { return _currentVersion; }
+            get { return _currentVersion + 1; }
         }
 
-        void Log(string message, params object[] formatArgs) {
+        public string CurrentMigration
+        {
+            get { return _currentVersion == -1 ? "" : Migrations.Keys.ElementAt(_currentVersion); }
+        }
+
+       
+        public void ListMigrations(string label)
+        {
+            // Force outoput to show
+            bool showOutput = _showOutput;
+            _currentVersion = Migrations.IndexOfKey((string)_db.QueryValue("SELECT Version from SchemaInfo"));
+            _showOutput = true;
+            Log(string.Format("Migrations list in {0} enviroment.\r\n", label));
+
+            for (int i = 0; i < LastVersion; i++)
+                Log("{0} {1}{2}", i+1, (i > _currentVersion ? "+" : "-"), Migrations.Keys.ElementAt(i));
+            Log("DB Current version: {0}", CurrentVersion);
+            _showOutput = showOutput;
+        }
+
+        void Log(string message, params object[] formatArgs)
+        {
             if (_showOutput) {
                 Console.WriteLine(message,formatArgs);
             }
         }
 
-        public void Migrate(int to=-1, bool execute=true) {
-            if(to < 0)
-                to = _versionCount;
+        public void Migrate(int to = -1, bool execute = true)
+        {
+            // Check heads and tails
+            if ((to > Migrations.Count) || (CurrentVersion < 0))
+            {
+                Log("No version {0} found. Please check if your migrations are ok.", to);
+                return;
+            }
+            if (execute == false)
+                Log("******** PRINT ONLY. NO COMMANDS ARE BEING SENT. ********");
+            
+            int current = _currentVersion; // Save position for later
+            if (CurrentVersion < to)
+            {
+                #region GOING UP     
+                Log("Migrating from {0} to {1}", CurrentVersion, to);
+                while (CurrentVersion < to)
+                {
+                    string migration_name = Migrations.Keys.ElementAt(++_currentVersion);
+                    var migration = Migrations[migration_name];
+                    Log("++ VERSION {0} Command: {1}", CurrentVersion, migration_name);
+                    string sql = GetCommand(migration.up);
+                    Log(sql);
+                    if (execute)
+                    {
+                        _db.Execute(sql);
+                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                    }
+                    Log("----------------------------------------------------\r\n");
+                }
+                #endregion
+            }
+            else if (CurrentVersion > to)
+            {
+                #region Going Down
+                Log("Migrating down from {0} to {1}", CurrentVersion, to);
+                while (CurrentVersion > to)
+                {
+                    string migration_name = Migrations.Keys.ElementAt(_currentVersion);
+                    var migration = Migrations[migration_name];
+                    Log("++ VERSION {0} Command: {1}", CurrentVersion, migration_name);
+                    string sql = migration.down == null ? ReadMinds(migration) : GetCommand(migration.up);
+                    string derived = migration.down == null ? "(DERIVED) " : string.Empty;
+                    Log("{0}{1}", derived, sql);
+                    migration_name = (--_currentVersion) == -1 ? "" : Migrations.Keys.ElementAt(_currentVersion);
+                    if (execute)
+                    {
+                        _db.Execute(sql);
+                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                    }
+                    Log("----------------------------------------------------\r\n");
+                }
+                #endregion
+            }
+            else
+                Log("Already in version {0}. Nothing to be done.", to);
+            if (!execute)
+                _currentVersion = current;
+        }
+        /*
+        public void MigrateOrig(int to = -1, bool execute = true)
+        {
+            to--;
+            //if(to < -1)
+            //    to = _versionCount;
             if (execute == false)
                 Log("******** PRINT ONLY. NO COMMANDS ARE BEING SENT. ********");
             if (_currentVersion < to) {
-                Log("Migrating from {0} to {1}", _currentVersion, to);
+                if (_currentVersion == -1) // first run
+                    _currentVersion = 0;
+                Log("Migrating from {0} to {1}", _currentVersion, to + 1);
                 //UP
-                for (int i = _currentVersion; i < to; i++) {
+                for (int i = _currentVersion; i < to-1; i++) {
                     //grab the next version - we start the loop with the current
                     var migration = Migrations.Values.ElementAt(i);
-                    Log("++ VERSION {0} Command: ", i + 1);
-                    string sql = GetCommand(migration.up);
-                    Log(sql);
+                    string migration_name = Migrations.Keys.ElementAt(i);
+                    Log("++ VERSION {0} Command: {1}", i + 1, migration_name);
+                   
                     if (execute) {
                         _db.Execute(sql);
                         //increment the version
-                        _db.Execute("UPDATE SchemaInfo SET Version = Version +1");
+                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
                         _currentVersion++;
                     }
                     Log("----------------------------------------------------\r\n");
@@ -129,42 +218,50 @@ namespace Manatee {
                 }
             } else {
                 //DOWN
-                for (int i = _currentVersion; i > to; i--) {
+                for (int i = _currentVersion; i > to-1; i--) 
+                {
                     //get the migration and execute it
-                    Log("Migrating down from {0} to {1}", _currentVersion, to);
-                    var migration = Migrations.Values.ElementAt(i - 1);
-                    Log("-- VERSION {0} Command: ", i + 1);
-
-                    if (migration.down == null) {
-                        var cmd = ReadMinds(migration);
-                        if (!String.IsNullOrEmpty(cmd)) {
-                            if (execute)
-                                _db.Execute(cmd);
-                            Log("(DERIVED) {0}", cmd);
+                    Log("Migrating down from {0} to {1}", _currentVersion + 1, to);
+                    string migration_name = (i - 1) >= 0 ? Migrations.Keys.ElementAt(i - 1) : "";
+                    if (i > 0)
+                    {
+                        var migration = Migrations.Values.ElementAt(i - 1);
+                        Log("-- VERSION {0} Command: {1}", i + 1, migration_name);
+                        if (migration.down == null)
+                        {
+                            var cmd = ReadMinds(migration);
+                            if (!String.IsNullOrEmpty(cmd))
+                            {
+                                if (execute)
+                                    _db.Execute(cmd);
+                                Log("(DERIVED) {0}", cmd);
+                            }
                         }
-                    } else {
-                        string sql = GetCommand(migration.down);
-                        if (execute)
-                            _db.Execute(sql);
+                        else
+                        {
+                            string sql = GetCommand(migration.down);
+                            if (execute)
+                                _db.Execute(sql);
 
-                        Log("{0}", sql);
+                            Log("{0}", sql);
 
+                        }
                     }
                     _currentVersion--;
                     //decrement the version
-                    _db.Execute("UPDATE SchemaInfo SET Version = Version - 1");
+                    if (execute)
+                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
                     Log("----------------------------------------------------\r\n");
                 }
             }
         }
+        */
         /// <summary>
         /// This is where the shorthand types are deciphered. Fix/love/tweak as you will
         /// </summary>
         private string SetColumnType(string colType) {
-            // Load extended types from file
-            var datatypes = Path.Combine(Directory.GetCurrentDirectory(), @"Migrations\datatypes.yml");
-            if (File.Exists(datatypes))
-                using (var t = new StreamReader(datatypes))
+            if (File.Exists(_datatypes))
+                using (var t = new StreamReader(_datatypes))
                 {
                     var bits = t.ReadToEnd();
                     JavaScriptSerializer deserializer = new JavaScriptSerializer();
@@ -349,12 +446,13 @@ REFERENCES {0} ([{2}]);";
         /// <summary>
         /// This is the migration file loader. It uses a SortedDictionary that will sort on the key (which is the file name). 
         /// So be sure to name your file with a descriptive, sortable name. A good way to do this is the year_month_day_time:
-        /// 2011_04_23_1233.js
+        /// 2011_04_23_1233.yml
         /// </summary>
-        private SortedDictionary<string, dynamic> LoadMigrations(string migrationPath) {
+        private SortedList<string, dynamic> LoadMigrations(string migrationPath)
+        {
             //read in the files in the db/migrations directory
             var migrationDir = new System.IO.DirectoryInfo(migrationPath);
-            var result = new SortedDictionary<string, dynamic>();
+            var result = new SortedList<string, dynamic>();
 
             var files = migrationDir.GetFiles();
             foreach (var file in files) {
@@ -371,6 +469,7 @@ REFERENCES {0} ([{2}]);";
             return result;
         }
 
+
         /// <summary>
         /// This loads up a special table that keeps track of what version your DB is on. It's one table with one field
         /// </summary>
@@ -378,8 +477,8 @@ REFERENCES {0} ([{2}]);";
             //does schema info exist?
             int exists = (int)db.QueryValue("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES where TABLE_NAME='SchemaInfo'");
             if (exists == 0) {
-                db.Execute("CREATE TABLE SchemaInfo (Version INT)");
-                db.Execute("INSERT INTO SchemaInfo(Version) VALUES(0)");
+                db.Execute("CREATE TABLE SchemaInfo (Version VARCHAR(255))");
+                db.Execute("INSERT INTO SchemaInfo(Version) VALUES('')");
             }
         }
 
@@ -397,20 +496,22 @@ REFERENCES {0} ([{2}]);";
         /// If a "down" isn't declared, this handy function will try and figure it out for you
         /// </summary>
         private string ReadMinds(dynamic migration) {
+            string result = string.Empty;
             //CREATE
             if (migration.up.create_table != null) {
-                return string.Format("DROP TABLE [{0}]", migration.up.create_table.name);
+                result = string.Format("DROP TABLE [{0}]", migration.up.create_table.name);
                 //DROP COLUMN
             } else if (migration.up.add_column != null) {
-                return string.Format("ALTER TABLE [{0}] DROP COLUMN {1}", migration.up.add_column, migration.up.add_column.columns[0].name);
+                result = string.Format("ALTER TABLE [{0}] DROP COLUMN {1}", migration.up.add_column, migration.up.add_column.columns[0].name);
             } else if (migration.up.add_index != null) {
                 // DROP INDEX
-                return string.Format("DROP INDEX {0}.{1}", migration.up.add_index.table_name, CreateIndexName(migration.up.add_index));
+                result = string.Format("DROP INDEX {0}.{1}", migration.up.add_index.table_name, CreateIndexName(migration.up.add_index));
             } else if (migration.up.foreign_key != null) {
                 // DROP FK
-                return string.Format("ALTER TABLE {1} DROP CONSTRAINT [FK_{1}_{0}]", migration.up.foreign_key.from_table, migration.up.foreign_key.to_table);
+                result = string.Format("ALTER TABLE {1} DROP CONSTRAINT [FK_{1}_{0}]", migration.up.foreign_key.from_table, migration.up.foreign_key.to_table);
             }
-            return "";
+            
+            return result;
         }
     }
 }

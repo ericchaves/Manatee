@@ -15,50 +15,65 @@ namespace VidPub.Tasks {
         //there
         static bool _syncTestDB = false;
 
+        private static string _migration_dir;
+        private static string _project_dir;
+        private static string _datatypes;
 
-        static Program()
+        static void Initialize()
         {
             // Test if there is an app.config or web.config in Working Directory.
             // If so bind the configuration to them. This allows Manatee to be used as external tool 
             // and have it load the connection strings from the projects configuration file.
-            string working_dir = Directory.GetCurrentDirectory();
-            if (File.Exists(Path.Combine(working_dir, "app.config")))
-                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "app.config"));
-            else if (File.Exists(Path.Combine(working_dir, "web.config")))
-                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(working_dir, "web.config"));
-
-            if (!File.Exists(Path.Combine(working_dir, "datatypes.yml")))
-                using (StreamWriter outfile = new StreamWriter(Path.Combine(working_dir, "datatypes.yml")))
+            if (File.Exists(Path.Combine(_project_dir, "app.config")))
+                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(_project_dir, "app.config"));
+            else if (File.Exists(Path.Combine(_project_dir, "web.config")))
+                AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", Path.Combine(_project_dir, "web.config"));
+            
+            _datatypes = Path.Combine(_project_dir, "datatypes.yml");
+            if (!File.Exists(_datatypes))
+                using (StreamWriter outfile = new StreamWriter(_datatypes))
                 {
-                    outfile.Write("{ \r\n  'pk': 'int PRIMARY KEY IDENTITY(1,1)',\r\n  'money': 'decimal(8,2)',\r\n  'date': 'datetime',\r\n  'string': 'nvarchar(255)',\r\n  'boolean': 'bit',\r\n  'text': 'nvarchar(MAX)',\r\n  'guid': 'uniqueidentifier'\r\n}");       
+                    outfile.Write("{ \r\n  'pk': 'int PRIMARY KEY IDENTITY(1,1)',\r\n  'money': 'decimal(8,4)',\r\n  'date': 'datetime',\r\n  'string': 'nvarchar(255)',\r\n  'boolean': 'bit',\r\n  'text': 'nvarchar(MAX)',\r\n  'guid': 'uniqueidentifier'\r\n}");
                 }
+
+            _migration_dir = Path.Combine(_project_dir, "Migrations");
+            if (!Directory.Exists(_migration_dir))
+                Directory.CreateDirectory(_migration_dir);
         }
 
         static string[] _args;
-        static void Main(string[] args) {
-        
-            var migrationDir = LocateMigrations();
-
+        static void Main(string[] args)
+        {
+            
+            #region Parse Arguments
+            _project_dir = Directory.GetCurrentDirectory();
+            int i = 0;
+            while (i < args.Length-1)
+            {
+                if (args[i].Equals("/project"))
+                {
+                    _project_dir = Path.GetFullPath(args[++i]); 
+                }else
+                  i++;
+            }
+            Initialize();
+            Console.WriteLine("Datatypes:\t{0}\r\nMigrations:\t{1}\r\nWorking dir:\t{2}", _datatypes, _migration_dir, _project_dir);
+            #endregion
+          
             _args = args;
-            _development = new Migrator(migrationDir, "development");
-            _test = new Migrator(migrationDir, "test",silent:true);
-            _production = new Migrator(migrationDir, "production");
+            _development = new Migrator(_datatypes, _migration_dir, "development");
+            _test = new Migrator(_datatypes, _migration_dir, "test", silent: true);
+            _production = new Migrator(_datatypes, _migration_dir, "production");
             SayHello();
         }
-        static string GetNameStub() {
-            var nextMigration = _development.LastVersion+1;
-            if (nextMigration < 10) {
-                return string.Format("00{0}", nextMigration);
-            } else if (nextMigration < 100) {
-                return string.Format("0{0}", nextMigration);
-            } else {
-                return string.Format("{0}", nextMigration);
-            }
+
+        static long GetNameStub() {
+            return long.Parse(DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
         }
         static void Generate(string name) {
             //drop the name to lower, add _'s, and an extension
             var splits = name.Split(new char[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
-            var fileName = name.ToLower().Replace(" ", "_") + ".js";
+            var fileName = name.ToLower().Replace(" ", "_") + ".yml";
             var template = Templates.Blank;
             
             //timestamp it
@@ -124,7 +139,7 @@ namespace VidPub.Tasks {
             }else if(command.StartsWith("down") || command.StartsWith("back") || command.StartsWith("rollback")){
                 //go back one if the version isn't specified
                 if (version < 0)
-                    version = _development.CurrentVersion - 1;
+                    version = _development.CurrentVersion -1 ;
                 _development.Migrate(version, execute: shouldExecute);
                 if (_syncTestDB)
                     _test.Migrate(version, execute: shouldExecute);
@@ -138,7 +153,7 @@ namespace VidPub.Tasks {
                 Environment.Exit(1);
                 return;
             }else if(command.StartsWith("list")){
-                ListMigrations();
+                ListMigrations(command);
             } else if (command.StartsWith("push")) {
                 //send it to production
                 _production.Migrate();
@@ -150,23 +165,18 @@ namespace VidPub.Tasks {
             DecideWhatToDo(cmd);
             
         }
-        static void ListMigrations(){
-            var migrationDir = new DirectoryInfo(LocateMigrations());
-            var files = migrationDir.GetFiles();
-            var reg = new Regex("\\d");
-            var counter = 1;
-            var currentVersion = _development.CurrentVersion;
-            foreach (var file in files)
-	        {
-                var wasRun = "-";
-                if (counter > currentVersion)
-                    wasRun = "+";
-                var fileName = Path.GetFileNameWithoutExtension(file.Name);
-                var migName = reg.Replace(fileName, "").Trim().Replace("_", " ");
-                Console.WriteLine("{0} {1}",wasRun,migName);
-                counter++;
-	        }
+        static void ListMigrations(string command){
+            string[] args = command.Split(new char[]{' '});
+            if (args.Length == 1)
+                _development.ListMigrations("development");
+            else if (args[1].StartsWith("p"))
+                _production.ListMigrations("production");
+            else if (args[1].StartsWith("t"))
+                _test.ListMigrations("test");
+            else
+                _development.ListMigrations("development");
         }
+
         static void HelpEmOut(){
             Console.WriteLine("You can say 'up', 'down', or 'migrate' with some arguments. Those arguments are:");
             Console.WriteLine(" ... /v - this is the version number to go up or down to. To wipe our your DB, /v 0");
@@ -196,17 +206,7 @@ namespace VidPub.Tasks {
             DecideWhatToDo(command);
         }
         static string LocateMigrations() {
-            string current = Directory.GetCurrentDirectory();
-            if (Directory.Exists(Path.Combine(current, "Migrations")))
-                return Path.Combine(current, "Migrations");
-
-            //this is the bin/release or bin/debug
-            var binDirectory = new DirectoryInfo(current);
-            //get the root - go up two levels
-            var rootDirectory = binDirectory.Parent.Parent;
-            //return the Migrations directory
-            return Path.Combine(rootDirectory.FullName, "Migrations");
-
+            return _migration_dir;
         }
     }
 }
