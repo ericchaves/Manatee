@@ -195,7 +195,7 @@ namespace Manatee {
                     string migration_name = Migrations.Keys.ElementAt(_currentVersion);
                     var migration = Migrations[migration_name];
                     Log("++ VERSION {0} Command: {1}", CurrentVersion, migration_name);
-                    string sql = migration.down == null ? ReadMinds(migration) : GetCommand(migration.up);
+                    string sql = migration.down == null ? ReadMinds(migration) : GetCommand(migration.down);
                     string derived = migration.down == null ? "(DERIVED) " : string.Empty;
                     Log("{0}{1}", derived, sql);
                     migration_name = (--_currentVersion) == -1 ? "" : Migrations.Keys.ElementAt(_currentVersion);
