@@ -259,6 +259,9 @@ namespace Manatee {
                 if(col.def != null){
                     sb.AppendFormat(" DEFAULT {0} ",col.def);
                 }
+                if (col.unique == true){
+                    sb.AppendFormat(" UNIQUE ");
+                }
                 counter++;
                 //this format will indent the column
                 if (counter < columns.Count) {
@@ -344,38 +347,41 @@ namespace Manatee {
                     }
                 }
                 columns = StripLeadingComma(columns);
-                sb.AppendFormat("CREATE TABLE [{0}]\r\n\t ({1});", op.create_table.name, columns);
+                sb.AppendFormat("CREATE TABLE [{0}]\r\n\t ({1});\r\n", op.create_table.name, columns);
 
                 //DROP 
             } 
             
             if (op.drop_table != null) {
-                sb.Append( "DROP TABLE " + op.drop_table+";");
+                sb.Append( "DROP TABLE " + op.drop_table+";\r\n");
                 //ADD COLUMN
             } 
             if (op.add_column != null) {
-                sb.AppendFormat("ALTER TABLE [{0}] ADD {1}; ", op.add_column.table, StripLeadingComma(BuildColumnList(op.add_column.columns)));
+                sb.AppendFormat("ALTER TABLE [{0}] ADD {1};\r\n ", op.add_column.table, StripLeadingComma(BuildColumnList(op.add_column.columns)));
                 //DROP COLUMN
             } 
             
             if (op.remove_column != null) {
-                sb.AppendFormat("ALTER TABLE [{0}] DROP COLUMN {1};", op.remove_column.table, op.remove_column.name);
+                sb.AppendFormat("ALTER TABLE [{0}] DROP COLUMN {1};\r\n", op.remove_column.table, op.remove_column.name);
                 //CHANGE
             } 
             if (op.change_column != null) {
                 sb.AppendFormat(
-                    "ALTER TABLE [{0}] ALTER COLUMN {1};", op.change_column.table, StripLeadingComma(BuildColumnList(op.change_column.columns)));
+                    "ALTER TABLE [{0}] ALTER COLUMN {1};\r\n", op.change_column.table, StripLeadingComma(BuildColumnList(op.change_column.columns)));
             } 
             if (op.add_index != null) {
                 sb.AppendFormat(
-                    "CREATE NONCLUSTERED INDEX [{0}] ON [{1}] ({2} );",
+                    "CREATE {0} {1} INDEX [{2}] ON [{3}] ({4} );\r\n",
+                    op.add_index.unique == true ? "UNIQUE" : "",
+                    op.add_index.clustered == true ? "CLUESTERED" : "NONCLUSTERED",
                     CreateIndexName(op.add_index),
                     op.add_index.table_name,
-                    CreateIndexColumnString(op.add_index.columns));
+                    CreateIndexColumnString(op.add_index.columns)
+                    );
                 //REMOVE INDEX
             } 
             if (op.remove_index != null) {
-                sb.AppendFormat("DROP INDEX {0}.{1};", op.remove_index.table_name, CreateIndexName(op.remove_index));
+                sb.AppendFormat("DROP INDEX {0}.{1};\r\n", op.remove_index.table_name, CreateIndexName(op.remove_index));
             } 
             if (op.foreign_key != null) {
                 string toColumn = op.foreign_key.to_column ?? op.foreign_key.from_column;
@@ -387,7 +393,7 @@ REFERENCES {0} ([{2}]);";
                     op.foreign_key.to_table, op.foreign_key.from_column, toColumn);
             } 
             if (op.drop_foreign_key != null) {
-                sb.AppendFormat("ALTER TABLE {0} DROP CONSTRAINT [FK_{0}_{1}];", op.drop_foreign_key.from_table, op.drop_foreign_key.to_table);
+                sb.AppendFormat("ALTER TABLE {0} DROP CONSTRAINT [FK_{0}_{1}];\r\n", op.drop_foreign_key.from_table, op.drop_foreign_key.to_table);
             }
             if (op.execute != null) {
                 if (!String.IsNullOrEmpty(op.execute)) {
