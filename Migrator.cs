@@ -15,8 +15,8 @@ namespace Manatee {
     public class Migrator {
         
         private string _datatypes;
+        private string _migrationPath;
         private int _currentVersion;
-        int _versionCount = 0;
         private Database _db;
         bool _showOutput = true;
         public SortedList<string, dynamic> Migrations { get; private set; }
@@ -84,13 +84,20 @@ namespace Manatee {
 
         public Migrator(string pathToDatatypes, string pathToMigrationFiles, string connectionStringName = "", bool silent = false) {
             _datatypes = pathToDatatypes;
+            _migrationPath = pathToMigrationFiles;
             _db = new Database(connectionStringName);
-            Migrations = LoadMigrations(pathToMigrationFiles);
+            Migrations = LoadMigrations(_migrationPath);
             EnsureSchema(_db);
             _showOutput = !silent;
             _currentVersion = Migrations.IndexOfKey((string)_db.QueryValue("SELECT Version from SchemaInfo"));
         }
 
+        public void Reload()
+        {
+            Migrations = LoadMigrations(_migrationPath);
+            EnsureSchema(_db);
+            _currentVersion = Migrations.IndexOfKey((string)_db.QueryValue("SELECT Version from SchemaInfo"));
+        }
         
         public int LastVersion {
             get {
@@ -188,74 +195,7 @@ namespace Manatee {
             if (!execute)
                 _currentVersion = current;
         }
-        /*
-        public void MigrateOrig(int to = -1, bool execute = true)
-        {
-            to--;
-            //if(to < -1)
-            //    to = _versionCount;
-            if (execute == false)
-                Log("******** PRINT ONLY. NO COMMANDS ARE BEING SENT. ********");
-            if (_currentVersion < to) {
-                if (_currentVersion == -1) // first run
-                    _currentVersion = 0;
-                Log("Migrating from {0} to {1}", _currentVersion, to + 1);
-                //UP
-                for (int i = _currentVersion; i < to-1; i++) {
-                    //grab the next version - we start the loop with the current
-                    var migration = Migrations.Values.ElementAt(i);
-                    string migration_name = Migrations.Keys.ElementAt(i);
-                    Log("++ VERSION {0} Command: {1}", i + 1, migration_name);
-                   
-                    if (execute) {
-                        _db.Execute(sql);
-                        //increment the version
-                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
-                        _currentVersion++;
-                    }
-                    Log("----------------------------------------------------\r\n");
-
-                }
-            } else {
-                //DOWN
-                for (int i = _currentVersion; i > to-1; i--) 
-                {
-                    //get the migration and execute it
-                    Log("Migrating down from {0} to {1}", _currentVersion + 1, to);
-                    string migration_name = (i - 1) >= 0 ? Migrations.Keys.ElementAt(i - 1) : "";
-                    if (i > 0)
-                    {
-                        var migration = Migrations.Values.ElementAt(i - 1);
-                        Log("-- VERSION {0} Command: {1}", i + 1, migration_name);
-                        if (migration.down == null)
-                        {
-                            var cmd = ReadMinds(migration);
-                            if (!String.IsNullOrEmpty(cmd))
-                            {
-                                if (execute)
-                                    _db.Execute(cmd);
-                                Log("(DERIVED) {0}", cmd);
-                            }
-                        }
-                        else
-                        {
-                            string sql = GetCommand(migration.down);
-                            if (execute)
-                                _db.Execute(sql);
-
-                            Log("{0}", sql);
-
-                        }
-                    }
-                    _currentVersion--;
-                    //decrement the version
-                    if (execute)
-                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
-                    Log("----------------------------------------------------\r\n");
-                }
-            }
-        }
-        */
+        
         /// <summary>
         /// This is where the shorthand types are deciphered. Fix/love/tweak as you will
         /// </summary>

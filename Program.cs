@@ -98,7 +98,11 @@ namespace VidPub.Tasks {
                 var bits = new ASCIIEncoding().GetBytes(chars);
                 stream.Write(bits,0,bits.Length);
             }
+            _development.Reload();
+            _test.Reload();
+            _production.Reload();
         }
+
         static int WhichVersion(string command) {
             int result = -1;
             var stems = command.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
