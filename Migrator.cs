@@ -19,6 +19,7 @@ namespace Manatee {
         private int _currentVersion;
         private Database _db;
         bool _showOutput = true;
+        private List<string> _invalid;
         public SortedList<string, dynamic> Migrations { get; private set; }
         
         void Execute(string query, params Database[] dbs) {
@@ -83,6 +84,7 @@ namespace Manatee {
         }
 
         public Migrator(string pathToDatatypes, string pathToMigrationFiles, string connectionStringName = "", bool silent = false) {
+            _invalid = new List<string>();
             _datatypes = pathToDatatypes;
             _migrationPath = pathToMigrationFiles;
             _db = new Database(connectionStringName);
@@ -114,7 +116,16 @@ namespace Manatee {
             get { return _currentVersion == -1 ? "" : Migrations.Keys.ElementAt(_currentVersion); }
         }
 
-       
+        public bool HasErrors
+        {
+            get { return _invalid.Count > 0;  }
+        }
+
+        public string[] InvalidMigrations
+        {
+            get { return _invalid.ToArray();  }
+        }
+ 
         public void ListMigrations(string label)
         {
             // Force outoput to show
@@ -124,7 +135,8 @@ namespace Manatee {
             Log(string.Format("Migrations list in {0} enviroment.\r\n", label));
 
             for (int i = 0; i < LastVersion; i++)
-                Log("{0} {1}{2}", i+1, (i > _currentVersion ? "+" : "-"), Migrations.Keys.ElementAt(i));
+                Log("{0} {1}{2}{3}", i + 1, (i > _currentVersion ? "+" : "-"), Migrations.Keys.ElementAt(i), 
+                    _invalid.IndexOf(Migrations.Keys.ElementAt(i)) == -1 ? "" : " !!");
             Log("DB Current version: {0}", CurrentVersion);
             _showOutput = showOutput;
         }
@@ -138,6 +150,12 @@ namespace Manatee {
 
         public void Migrate(int to = -1, bool execute = true)
         {
+            if (HasErrors)
+            {
+                Log("{0} migrations malformed. Please fix it before running them.", _invalid.Count);
+                return;
+            }
+
             // Check heads and tails
             if ((to > Migrations.Count) || (CurrentVersion < 0))
             {
@@ -393,17 +411,26 @@ REFERENCES {0} ([{2}]);";
             //read in the files in the db/migrations directory
             var migrationDir = new System.IO.DirectoryInfo(migrationPath);
             var result = new SortedList<string, dynamic>();
+            _invalid.Clear();
 
             var files = migrationDir.GetFiles();
             foreach (var file in files) {
                 using (var t = new StreamReader(file.FullName)) {
                     var bits = t.ReadToEnd();
-
+                     string mig = Path.GetFileNameWithoutExtension(file.FullName);
                     //Uh oh! Did you get an error? JSON can be tricky - you have to be sure you quote your values
                     //as javascript only recognizes strings, booleans, numerics, or arrays of those things.
                     //if you always use a string.
-                    dynamic decoded = JsonHelper.Decode(bits); //new JsonReader().Read(bits);
-                    result.Add(Path.GetFileNameWithoutExtension(file.FullName), decoded);
+                    try
+                    {
+                        dynamic decoded = JsonHelper.Decode(bits); //new JsonReader().Read(bits);
+                        result.Add(mig, decoded);
+                    }
+                    catch (ArgumentException)
+                    {
+                        _invalid.Add(mig);
+                        result.Add(mig, "");
+                    }
                 }
             }
             return result;

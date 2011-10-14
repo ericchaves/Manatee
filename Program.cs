@@ -61,9 +61,7 @@ namespace VidPub.Tasks {
             #endregion
           
             _args = args;
-            _development = new Migrator(_datatypes, _migration_dir, "development");
-            _test = new Migrator(_datatypes, _migration_dir, "test", silent: true);
-            _production = new Migrator(_datatypes, _migration_dir, "production");
+            Reload();
             SayHello();
         }
 
@@ -98,11 +96,18 @@ namespace VidPub.Tasks {
                 var bits = new ASCIIEncoding().GetBytes(chars);
                 stream.Write(bits,0,bits.Length);
             }
-            _development.Reload();
-            _test.Reload();
-            _production.Reload();
+            Reload();
         }
 
+        static void Reload()
+        {
+            _development = new Migrator(_datatypes, _migration_dir, "development");
+            _test = new Migrator(_datatypes, _migration_dir, "test", silent: true);
+            _production = new Migrator(_datatypes, _migration_dir, "production");
+            _production.Reload();
+            if (_development.HasErrors)
+                Console.WriteLine("*** Invalid migrations found ***.\r\nList migrations and look for those suffixed with !!");
+        }
         static int WhichVersion(string command) {
             int result = -1;
             var stems = command.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -161,6 +166,8 @@ namespace VidPub.Tasks {
             } else if (command.StartsWith("push")) {
                 //send it to production
                 _production.Migrate();
+            }else if (command.StartsWith("reload")||command.Equals("r")){
+                Reload();
             }else{
                 HelpEmOut();
             }
