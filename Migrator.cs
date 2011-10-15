@@ -179,8 +179,16 @@ namespace Manatee {
                     Log(sql);
                     if (execute)
                     {
-                        _db.Execute(sql);
-                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                        try
+                        {
+                            _db.Execute(sql);
+                            _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                        }
+                        catch (Exception ex)
+                        {  
+                            Log("Migration {0} generate and exception.\r\n Your database may be in an inconcistent state.\r\n{1}", migration_name, ex.Message);
+                            break;
+                        }
                     }
                     Log("----------------------------------------------------\r\n");
                 }
@@ -201,8 +209,16 @@ namespace Manatee {
                     migration_name = (--_currentVersion) == -1 ? "" : Migrations.Keys.ElementAt(_currentVersion);
                     if (execute)
                     {
-                        _db.Execute(sql);
-                        _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                        try
+                        {
+                            _db.Execute(sql);
+                            _db.Execute(string.Format("UPDATE SchemaInfo SET Version = '{0}'", migration_name));
+                        }
+                        catch (Exception ex)
+                        {
+                            Log("Migration {0} generate and exception.\r\n Your database may be in an inconcistent state.\r\n{1}", migration_name, ex.Message);
+                            break;
+                        }
                     }
                     Log("----------------------------------------------------\r\n");
                 }
